@@ -24,5 +24,5 @@ source "$conda_sh_path"
 
 
 
-conda activate ./.conda_environment
-python src/visualize.py
+conda activate .deploy/conda_environment/
+code src/visualize.ipynb
