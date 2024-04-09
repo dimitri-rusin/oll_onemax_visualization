@@ -1,0 +1,6 @@
+colored==2.2.3
+inspectify==0.0.2
+jupyter==1.0.0
+numpy==1.24.2
+plotly==5.18.0
+seaborn==0.12.2
