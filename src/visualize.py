@@ -6,6 +6,18 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.graph_objs as go
 import sqlite3
+import subprocess
+
+def sync_data(source, destination):
+  cmd = ["rsync", "-avz", "--progress", source, destination]
+
+  try:
+    result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+    print("Sync completed successfully.")
+    print(result.stdout)
+  except subprocess.CalledProcessError as e:
+    print("Error in sync:")
+    print(e.stderr)
 
 def load_config_data(db_path):
   loaded_config = {}
@@ -202,12 +214,12 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   cursor = conn.cursor()
 
   # Fetch baseline fitness-lambda data (policy_id = -1)
-  cursor.execute('SELECT fitness, lambda_minus_one FROM POLICY_DETAILS WHERE policy_id = -1')
+  cursor.execute('SELECT fitness, lambda FROM POLICY_DETAILS WHERE policy_id = -1')
   baseline_fitness_lambda_data = cursor.fetchall()
 
   baseline_curve = go.Scatter(
     x=[d[0] for d in baseline_fitness_lambda_data],
-    y=[d[1] + 1 for d in baseline_fitness_lambda_data],
+    y=[d[1] for d in baseline_fitness_lambda_data],
     mode='lines+markers',
     name='Baseline Fitness-Lambda',
     line=dict(color='orange', width=4)
@@ -226,12 +238,12 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
     std_dev_initial_fitness = math.sqrt(variance_initial_fitness)
 
   # Fetch fitness-lambda data for the specified policy
-  cursor.execute('SELECT fitness, lambda_minus_one FROM POLICY_DETAILS WHERE policy_id = ?', (policy_id,))
+  cursor.execute('SELECT fitness, lambda FROM POLICY_DETAILS WHERE policy_id = ?', (policy_id,))
   fitness_lambda_data = cursor.fetchall()
 
   selected_policy_curve = go.Scatter(
     x=[d[0] for d in fitness_lambda_data],
-    y=[d[1] + 1 for d in fitness_lambda_data],
+    y=[d[1] for d in fitness_lambda_data],
     mode='lines+markers',
     name=f'Fitness-Lambda Policy {policy_id}',
     line=dict(color='blue', width=4)
@@ -243,14 +255,14 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   if mean_initial_fitness is not None:
     upper_bound = go.Scatter(
       x=[mean_initial_fitness + std_dev_initial_fitness] * 2,
-      y=[0, max([d[1] + 1 for d in fitness_lambda_data])],
+      y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
       line=dict(width=0),
       showlegend=False
     )
     lower_bound = go.Scatter(
       x=[mean_initial_fitness - std_dev_initial_fitness] * 2,
-      y=[0, max([d[1] + 1 for d in fitness_lambda_data])],
+      y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
       fill='tonexty',
       fillcolor='rgba(0, 255, 0, 0.2)',
@@ -259,7 +271,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
     )
     mean_line = go.Scatter(
       x=[mean_initial_fitness, mean_initial_fitness],
-      y=[0, max([d[1] + 1 for d in fitness_lambda_data])],
+      y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
       name=f'Mean Initial Fitness',
       line=dict(color='green', width=2, dash='dot')
