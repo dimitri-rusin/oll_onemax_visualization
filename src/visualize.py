@@ -214,7 +214,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   cursor = conn.cursor()
 
   # Fetch baseline fitness-lambda data (policy_id = -1)
-  cursor.execute('SELECT fitness, lambda FROM POLICY_DETAILS WHERE policy_id = -1')
+  cursor.execute('SELECT fitness, crossover_size FROM POLICY_DETAILS WHERE policy_id = -1')
   baseline_fitness_lambda_data = cursor.fetchall()
 
   baseline_curve = go.Scatter(
@@ -238,7 +238,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
     std_dev_initial_fitness = math.sqrt(variance_initial_fitness)
 
   # Fetch fitness-lambda data for the specified policy
-  cursor.execute('SELECT fitness, lambda FROM POLICY_DETAILS WHERE policy_id = ?', (policy_id,))
+  cursor.execute('SELECT fitness, crossover_size FROM POLICY_DETAILS WHERE policy_id = ?', (policy_id,))
   fitness_lambda_data = cursor.fetchall()
 
   selected_policy_curve = go.Scatter(
@@ -405,3 +405,177 @@ def diagrams(db_path_str_or_db_paths_list, xaxis_choice, yaxis_choice, policy_to
       policy_performance(db_path, xaxis_choice, yaxis_choice)
       if policy_total_timesteps is not None:
         generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, yaxis_choice)
+
+
+
+
+
+
+
+import sqlite3
+import plotly.graph_objects as go
+import os
+import numpy as np
+
+def create_multi_policy_performance_boxplot(paths, yaxis_choice="num_function_evaluations"):
+  fig = go.Figure()
+
+  for db_path in paths:
+    with sqlite3.connect(db_path) as conn:
+      cursor = conn.cursor()
+      # Query for policies with ID >= 0
+      cursor.execute(f'''
+          SELECT policy_id, AVG({yaxis_choice}) as avg_eval
+          FROM EVALUATION_EPISODES
+          WHERE policy_id >= 0
+          GROUP BY policy_id
+      ''')
+      results = cursor.fetchall()
+
+      # Query for policy with ID -1
+      cursor.execute(f'''
+          SELECT policy_id, AVG({yaxis_choice}) as avg_eval
+          FROM EVALUATION_EPISODES
+          WHERE policy_id = -1
+          GROUP BY policy_id
+      ''')
+      result_negative_one = cursor.fetchone()
+
+    # Extract policy IDs and their corresponding average evaluations
+    policy_ids = [result[0] for result in results]
+    avg_evaluations = [result[1] for result in results]
+
+    # Determine the highest policy ID and its average
+    if policy_ids:  # Check if list is not empty
+      max_policy_id = max(policy_ids)
+      max_index = policy_ids.index(max_policy_id)
+      max_avg = avg_evaluations[max_index]
+
+      # Extract the average for policy ID -1
+      avg_eval_negative_one = result_negative_one[1] if result_negative_one else None
+
+      # Extract filename from the path for x-axis labeling
+      filename = os.path.basename(db_path)
+
+      # Add boxplot for each database
+      fig.add_trace(go.Box(
+          y=avg_evaluations,
+          name=filename,  # Use filename as the x-value (category)
+          boxpoints='all',
+          jitter=0.5,
+          pointpos=0,
+          hoverinfo='y+name',
+          hovertemplate=f'File: {filename}<br>Avg: {{y}}<br>Policy ID: {{text}}',
+          text=policy_ids  # Pass policy IDs for hover template
+      ))
+
+      # Add a special marker for the highest policy ID
+      fig.add_trace(go.Scatter(
+          x=[filename],  # Match the x-value with the boxplot
+          y=[max_avg],
+          mode='markers',
+          marker=dict(symbol='star', size=12, color='red'),
+          name=f'Policy {max_policy_id} Max Avg in {filename}',
+          hoverinfo='name+y',
+          hovertemplate=f'File: {filename}<br>Max Avg: {{y}}<br>Policy ID: {max_policy_id}'
+      ))
+
+      # Add a special marker for policy ID -1
+      if avg_eval_negative_one is not None:
+          fig.add_trace(go.Scatter(
+              x=[filename],
+              y=[avg_eval_negative_one],
+              mode='markers',
+              marker=dict(symbol='triangle-up', size=12, color='yellow'),
+              name=f'Policy -1 Avg in {filename}',
+              hoverinfo='name+y',
+              hovertemplate=f'File: {filename}<br>Avg: {{y}}<br>Policy ID: -1'
+          ))
+
+  # Customize layout
+  fig.update_layout(
+      title='Average Function Evaluations by Policy Across Databases',
+      xaxis_title='Database Files',
+      yaxis_title='Average Number of Function Evaluations',
+      showlegend=True
+  )
+
+  fig.show()
+
+def compute_hitting_times(paths, error_margin, yaxis_choice="num_function_evaluations"):
+    hitting_times_list = []
+    total_policies_list = []
+
+    for db_path in paths:
+        hitting_times = 0
+        total_policies = 0
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f'''
+                SELECT policy_id, AVG({yaxis_choice}) as avg_eval
+                FROM EVALUATION_EPISODES
+                WHERE policy_id >= 0
+                GROUP BY policy_id
+            ''')
+            results = cursor.fetchall()
+
+            cursor.execute(f'''
+                SELECT AVG({yaxis_choice}) as avg_eval,
+                       GROUP_CONCAT({yaxis_choice}) as evaluations
+                FROM EVALUATION_EPISODES
+                WHERE policy_id = -1
+            ''')
+            result_negative_one = cursor.fetchone()
+
+            if result_negative_one:
+                baseline_avg = result_negative_one[0]
+                baseline_evaluations = list(map(float, result_negative_one[1].split(',')))
+                baseline_stddev = np.std(baseline_evaluations)
+
+            total_policies = len(results)
+
+            for result in results:
+                policy_id = result[0]
+                avg_evaluation = result[1]
+
+                if result_negative_one and avg_evaluation < baseline_avg + error_margin * baseline_stddev:
+                    hitting_times += 1
+
+        hitting_times_list.append(hitting_times)
+        total_policies_list.append(total_policies)
+
+    return hitting_times_list, total_policies_list
+
+def experiments_summary(experiment_paths):
+
+  create_multi_policy_performance_boxplot(experiment_paths)
+
+  error_margin = 0
+
+  # Compute hitting times and total number of policies for all database paths
+  hitting_times_list, total_policies_list = compute_hitting_times(experiment_paths, error_margin)
+
+  # Calculate the difference between total policies and hitting policies count
+  missing_policies_list = [total_policies - hitting_times for total_policies, hitting_times in zip(total_policies_list, hitting_times_list)]
+
+  # Create bar chart using Plotly
+  fig = go.Figure()
+
+  # Add total policies bar (blue bar, above)
+  fig.add_trace(go.Bar(x=[os.path.basename(path) for path in experiment_paths],
+                       y=hitting_times_list,
+                       name="Hitting Times"))
+
+  # Add hitting times bar (red bar, below)
+  fig.add_trace(go.Bar(x=[os.path.basename(path) for path in experiment_paths],
+                       y=missing_policies_list,
+                       name="Missing Policies"))
+
+  fig.update_layout(title="Hitting Times vs Total Policies",
+                    xaxis_title="Database Paths",
+                    yaxis_title="Count",
+                    barmode='stack',  # Stack bars vertically
+                    bargap=0.1,       # Gap between bars of adjacent location coordinates
+                    bargroupgap=0.1)  # Gap between bars of the same location coordinate
+  fig.show()
