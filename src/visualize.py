@@ -1,10 +1,9 @@
 import ast
+import plotly.graph_objects
 import inspectify
 import math
 import os
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.graph_objs as go
+import pandas
 import sqlite3
 import subprocess
 
@@ -154,12 +153,12 @@ def load_policy_performance_data(db_path, xaxis_choice, yaxis_choice):
   baseline_lower_bound = [baseline_avg_length - baseline_std_dev] * len(num_training_timesteps_or_num_training_fes)
 
   data = [
-    go.Scatter(x=num_training_timesteps_or_num_training_fes, y=avg_function_evaluations, mode='lines+markers', name='#FEs until optimum', line=dict(color='blue', width=4)),
-    go.Scatter(x=num_training_timesteps_or_num_training_fes, y=[avg + std for avg, std in zip(avg_function_evaluations, std_dev_evaluations)], mode='lines', line=dict(color='rgba(173,216,230,0.2)'), name='Upper Bound (Mean + Std. Dev.)'),
-    go.Scatter(x=num_training_timesteps_or_num_training_fes, y=[avg - std for avg, std in zip(avg_function_evaluations, std_dev_evaluations)], mode='lines', fill='tonexty', line=dict(color='rgba(173,216,230,0.2)'), name='Lower Bound (Mean - Std. Dev.)'),
-    go.Scatter(x=[min(num_training_timesteps_or_num_training_fes), max(num_training_timesteps_or_num_training_fes)] if num_training_timesteps_or_num_training_fes else [0], y=[baseline_avg_length, baseline_avg_length], mode='lines', name='Theory: √(𝑛/(𝑛 − 𝑓(𝑥)))', line=dict(color='orange', width=2, dash='dash')),
-    go.Scatter(x=num_training_timesteps_or_num_training_fes, y=baseline_upper_bound, mode='lines', line=dict(color='rgba(255, 165, 0, 0.2)'), name='Upper Bound (Baseline Variance)'),
-    go.Scatter(x=num_training_timesteps_or_num_training_fes, y=baseline_lower_bound, mode='lines', fill='tonexty', line=dict(color='rgba(255, 165, 0, 0.2)'), name='Lower Bound (Baseline Variance)'),
+    plotly.graph_objects.Scatter(x=num_training_timesteps_or_num_training_fes, y=avg_function_evaluations, mode='lines+markers', name='#FEs until optimum', line=dict(color='blue', width=4)),
+    plotly.graph_objects.Scatter(x=num_training_timesteps_or_num_training_fes, y=[avg + std for avg, std in zip(avg_function_evaluations, std_dev_evaluations)], mode='lines', line=dict(color='rgba(173,216,230,0.2)'), name='Upper Bound (Mean + Std. Dev.)'),
+    plotly.graph_objects.Scatter(x=num_training_timesteps_or_num_training_fes, y=[avg - std for avg, std in zip(avg_function_evaluations, std_dev_evaluations)], mode='lines', fill='tonexty', line=dict(color='rgba(173,216,230,0.2)'), name='Lower Bound (Mean - Std. Dev.)'),
+    plotly.graph_objects.Scatter(x=[min(num_training_timesteps_or_num_training_fes), max(num_training_timesteps_or_num_training_fes)] if num_training_timesteps_or_num_training_fes else [0], y=[baseline_avg_length, baseline_avg_length], mode='lines', name='Theory: √(𝑛/(𝑛 − 𝑓(𝑥)))', line=dict(color='orange', width=2, dash='dash')),
+    plotly.graph_objects.Scatter(x=num_training_timesteps_or_num_training_fes, y=baseline_upper_bound, mode='lines', line=dict(color='rgba(255, 165, 0, 0.2)'), name='Upper Bound (Baseline Variance)'),
+    plotly.graph_objects.Scatter(x=num_training_timesteps_or_num_training_fes, y=baseline_lower_bound, mode='lines', fill='tonexty', line=dict(color='rgba(255, 165, 0, 0.2)'), name='Lower Bound (Baseline Variance)'),
   ]
 
   conn.close()
@@ -168,7 +167,7 @@ def load_policy_performance_data(db_path, xaxis_choice, yaxis_choice):
 def policy_performance(db_path, xaxis_choice, yaxis_choice):
   data = load_policy_performance_data(db_path, xaxis_choice, yaxis_choice)
   # Define the layout with larger dimensions and enhanced appearance
-  layout = go.Layout(
+  layout = plotly.graph_objects.Layout(
     titlefont=dict(size=24),  # Bigger title font size
     xaxis=dict(
       title=xaxis_choice.replace('_', ' ').title(),
@@ -193,7 +192,7 @@ def policy_performance(db_path, xaxis_choice, yaxis_choice):
     showlegend=False,  # This will remove the legend
   )
 
-  fig = go.Figure(data=data, layout=layout)
+  fig = plotly.graph_objects.Figure(data=data, layout=layout)
   fig.show()
 
 def get_policy_id_for_timesteps(db_path, total_timesteps):
@@ -217,7 +216,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   cursor.execute('SELECT fitness, crossover_size FROM POLICY_DETAILS WHERE policy_id = -1')
   baseline_fitness_lambda_data = cursor.fetchall()
 
-  baseline_curve = go.Scatter(
+  baseline_curve = plotly.graph_objects.Scatter(
     x=[d[0] for d in baseline_fitness_lambda_data],
     y=[d[1] for d in baseline_fitness_lambda_data],
     mode='lines+markers',
@@ -241,7 +240,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   cursor.execute('SELECT fitness, crossover_size FROM POLICY_DETAILS WHERE policy_id = ?', (policy_id,))
   fitness_lambda_data = cursor.fetchall()
 
-  selected_policy_curve = go.Scatter(
+  selected_policy_curve = plotly.graph_objects.Scatter(
     x=[d[0] for d in fitness_lambda_data],
     y=[d[1] for d in fitness_lambda_data],
     mode='lines+markers',
@@ -253,14 +252,14 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
 
   # Adding shaded area for variance if available
   if mean_initial_fitness is not None:
-    upper_bound = go.Scatter(
+    upper_bound = plotly.graph_objects.Scatter(
       x=[mean_initial_fitness + std_dev_initial_fitness] * 2,
       y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
       line=dict(width=0),
       showlegend=False
     )
-    lower_bound = go.Scatter(
+    lower_bound = plotly.graph_objects.Scatter(
       x=[mean_initial_fitness - std_dev_initial_fitness] * 2,
       y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
@@ -269,7 +268,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
       line=dict(width=0),
       name='Variance Initial Fitness'
     )
-    mean_line = go.Scatter(
+    mean_line = plotly.graph_objects.Scatter(
       x=[mean_initial_fitness, mean_initial_fitness],
       y=[0, max([d[1] for d in fitness_lambda_data])],
       mode='lines',
@@ -278,7 +277,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
     )
     data.extend([upper_bound, lower_bound, mean_line])
 
-  layout = go.Layout(
+  layout = plotly.graph_objects.Layout(
     title=f'Fitness-Lambda Assignment for Policy {policy_id}',
     xaxis=dict(title='Fitness'),
     yaxis=dict(title='Lambda'),
@@ -319,7 +318,7 @@ def generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, 
   # ================= PRINT END ====================================
 
   conn.close()
-  fig = go.Figure(data=data, layout=layout)
+  fig = plotly.graph_objects.Figure(data=data, layout=layout)
   fig.show()
 
 def print_matching(db_folder_path, filter_expression):
@@ -339,7 +338,7 @@ def display_config_as_dataframe(db_path):
 
   try:
     with sqlite3.connect(db_path) as conn:
-      df = pd.read_sql_query("SELECT key, value FROM CONFIG", conn)
+      df = pandas.read_sql_query("SELECT key, value FROM CONFIG", conn)
   except sqlite3.Error as e:
     print(f"SQLite error: {e}")
     return None
@@ -387,7 +386,7 @@ def display_config_as_dataframe(db_path):
       new_rows.append({'key': row['key'], 'value': formatted_value})
 
   # Create a new DataFrame from the processed rows and set 'key' as the index
-  new_df = pd.DataFrame(new_rows).set_index('key')
+  new_df = pandas.DataFrame(new_rows).set_index('key')
 
   return new_df
 
@@ -407,18 +406,64 @@ def diagrams(db_path_str_or_db_paths_list, xaxis_choice, yaxis_choice, policy_to
         generate_fitness_lambda_plot(db_path, policy_total_timesteps, xaxis_choice, yaxis_choice)
 
 
-
-
-
-
-
 import sqlite3
+import numpy as numpy
 import plotly.graph_objects as go
 import os
-import numpy as np
+
+def compute_area_between_baseline_and_policy(db_path):
+    # Connect to the database
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+
+        # Fetch the baseline value for policy ID -1
+        cursor.execute('''
+            SELECT AVG(num_function_evaluations)
+            FROM EVALUATION_EPISODES
+            WHERE policy_id = -1
+        ''')
+        fetched = cursor.fetchone()
+        baseline_value = fetched[0] if fetched else 0
+
+        # Fetch average evaluations for each policy excluding ID -1 and calculate area
+        cursor.execute('''
+            SELECT policy_id, AVG(num_function_evaluations)
+            FROM EVALUATION_EPISODES
+            WHERE policy_id >= 0
+            GROUP BY policy_id
+            ORDER BY policy_id
+        ''')
+        eval_results = cursor.fetchall()
+
+        # If no results, return area as zero
+        if not eval_results:
+            return 0
+
+        # Extract evaluations and create timestep indices
+        avg_evaluations = numpy.array([result[1] for result in eval_results])
+        timestep_names = numpy.arange(len(avg_evaluations))
+        baseline_array = numpy.full(avg_evaluations.shape, baseline_value)
+
+        # Compute the difference and integrate to find the area
+        difference = avg_evaluations - baseline_array
+        area = numpy.trapz(difference, timestep_names)
+
+        return area
+
+def visualize_areas(area_values, db_paths):
+  # Extract the basenames of the file paths without extension for labeling
+  basenames = [os.path.splitext(os.path.basename(path))[0] for path in db_paths]
+
+  # Create a bar chart using Plotly
+  fig = plotly.graph_objects.Figure([plotly.graph_objects.Bar(x=basenames, y=area_values)])
+  fig.update_layout(title='Area Between Baseline and Policy Evaluations Across Databases',
+                    xaxis_title='Database',
+                    yaxis_title='Computed Area',
+                    showlegend=False)
+  fig.show()
 
 def create_multi_policy_performance_boxplot(paths, yaxis_choice="num_function_evaluations"):
-  fig = go.Figure()
+  fig = plotly.graph_objects.Figure()
 
   for db_path in paths:
     with sqlite3.connect(db_path) as conn:
@@ -458,7 +503,7 @@ def create_multi_policy_performance_boxplot(paths, yaxis_choice="num_function_ev
       filename = os.path.basename(db_path)
 
       # Add boxplot for each database
-      fig.add_trace(go.Box(
+      fig.add_trace(plotly.graph_objects.Box(
           y=avg_evaluations,
           name=filename,  # Use filename as the x-value (category)
           boxpoints='all',
@@ -470,7 +515,7 @@ def create_multi_policy_performance_boxplot(paths, yaxis_choice="num_function_ev
       ))
 
       # Add a special marker for the highest policy ID
-      fig.add_trace(go.Scatter(
+      fig.add_trace(plotly.graph_objects.Scatter(
           x=[filename],  # Match the x-value with the boxplot
           y=[max_avg],
           mode='markers',
@@ -482,7 +527,7 @@ def create_multi_policy_performance_boxplot(paths, yaxis_choice="num_function_ev
 
       # Add a special marker for policy ID -1
       if avg_eval_negative_one is not None:
-          fig.add_trace(go.Scatter(
+          fig.add_trace(plotly.graph_objects.Scatter(
               x=[filename],
               y=[avg_eval_negative_one],
               mode='markers',
@@ -531,7 +576,7 @@ def compute_hitting_times(paths, error_margin, yaxis_choice="num_function_evalua
             if result_negative_one:
                 baseline_avg = result_negative_one[0]
                 baseline_evaluations = list(map(float, result_negative_one[1].split(',')))
-                baseline_stddev = np.std(baseline_evaluations)
+                baseline_stddev = numpy.std(baseline_evaluations)
 
             total_policies = len(results)
 
@@ -560,15 +605,15 @@ def experiments_summary(experiment_paths):
   missing_policies_list = [total_policies - hitting_times for total_policies, hitting_times in zip(total_policies_list, hitting_times_list)]
 
   # Create bar chart using Plotly
-  fig = go.Figure()
+  fig = plotly.graph_objects.Figure()
 
   # Add total policies bar (blue bar, above)
-  fig.add_trace(go.Bar(x=[os.path.basename(path) for path in experiment_paths],
+  fig.add_trace(plotly.graph_objects.Bar(x=[os.path.basename(path) for path in experiment_paths],
                        y=hitting_times_list,
                        name="Hitting Times"))
 
   # Add hitting times bar (red bar, below)
-  fig.add_trace(go.Bar(x=[os.path.basename(path) for path in experiment_paths],
+  fig.add_trace(plotly.graph_objects.Bar(x=[os.path.basename(path) for path in experiment_paths],
                        y=missing_policies_list,
                        name="Missing Policies"))
 
@@ -579,3 +624,6 @@ def experiments_summary(experiment_paths):
                     bargap=0.1,       # Gap between bars of adjacent location coordinates
                     bargroupgap=0.1)  # Gap between bars of the same location coordinate
   fig.show()
+
+  area_values = [compute_area_between_baseline_and_policy(db) for db in experiment_paths]
+  visualize_areas(area_values, experiment_paths)
