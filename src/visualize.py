@@ -115,7 +115,7 @@ def load_policy_performance_data(db_path, xaxis_choice, yaxis_choice):
   cursor = conn.cursor()
 
   # Execute SQL query based on x-axis choice
-  cursor.execute(f'SELECT policy_id, {xaxis_choice} FROM CONSTRUCTED_POLICIES WHERE policy_id >= 1')
+  cursor.execute(f'SELECT DISTINCT policy_id, {xaxis_choice} FROM CONSTRUCTED_POLICIES WHERE policy_id >= 1')
   training_data = cursor.fetchall()
 
   try:
@@ -328,7 +328,8 @@ def print_matching(db_folder_path, filter_expression):
     print("NO MATCH!")
     return
   for path in matching_db_paths:
-    print(path)
+    # print(path)
+    pass
   return matching_db_paths
 
 def display_config_as_dataframe(db_path):
